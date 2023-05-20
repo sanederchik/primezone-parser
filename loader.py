@@ -4,6 +4,8 @@ from bs4 import BeautifulSoup
 import re
 from time import sleep
 from copy import deepcopy
+from hashlib import md5
+import json
 
 class PZLoader:
 
@@ -345,21 +347,23 @@ class Processor:
 
     def parseAddressCoordsToFinalData(self):
 
-        data = []
+        data = {}
 
         for k1, l1 in self.data.items():
             for l2 in l1['res']:
                 for l3 in l2['response']['GeoObjectCollection']['featureMember']:
 
+                    _coords = l3['GeoObject']['Point']['pos'].split(' ')
+
                     coordsObj = {
                         'url': l1['ctx']['sale_add_info_url'],
                         'address_txt': k1,
-                        'coords': l3['GeoObject']['Point']['pos'].split(' ')
+                        'coords': [float(_coords[1]), float(_coords[0])]
                     }
 
                     finalObj = {**coordsObj, **l1['ctx']}
-
-                    data.append(finalObj)
+                    key = md5('_'.join([finalObj['sale_add_info_url'], json.dumps(finalObj['coords']), finalObj['address_txt']]).encode('utf-8')).hexdigest()
+                    data[key] = finalObj
 
         return data
 

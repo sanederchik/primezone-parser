@@ -1,9 +1,22 @@
 import json
+from io import BytesIO
+from datetime import date
 
 from loader import PZLoader, YandexMapsLoader, Processor
+from S3 import S3
 import config as cfg
 
+def objToBytesIO(o: any):
+    return BytesIO(json.dumps(o, ensure_ascii=False).encode())
+
 def main():
+
+    # объект загрузчик в S3
+    S3O = S3({
+        'ACCESS_KEY_ID': cfg.ycloud.ACCESS_KEY_ID,
+        'SECRET_ACCESS_KEY': cfg.ycloud.SECRET_ACCESS_KEY,
+        'ENDPOINT_URL': cfg.ycloud.endpointUrl
+    })
 
     #подгружаем изначальные данные
     o = PZLoader(cfg.urls.pz_auth)
@@ -15,9 +28,11 @@ def main():
     p = Processor(data)
     data = p.parseStage1Data()
 
-    with open(f'{cfg.roots.data_root}/sales.json', encoding=cfg.BASE_ENCODING, mode='w+') as f:
-        json.dump(data, f, ensure_ascii=False)
-        f.close()
+    S3O.uploadFile(
+        objToBytesIO(data),
+        cfg.ycloud.bucketName,
+        'sales.json'
+    )
 
     # #делаем еще раз запросы с уточнением адресов ресторанов
     data = o.getStage2Data(data)
@@ -26,19 +41,19 @@ def main():
     p = Processor(data)
     data = p.parseStage2Data()
 
-    with open(f'{cfg.roots.data_root}/addresses.json', encoding=cfg.BASE_ENCODING, mode='w+') as f:
-        json.dump(data, f, ensure_ascii=False)
-        f.close()
+    S3O.uploadFile(
+        objToBytesIO(data),
+        cfg.ycloud.bucketName,
+        'addresses.json'
+    )
 
-    #получаем данные по точкам из Яндекс Карт
-    #не делая запросы по тем адресам, которые уже известны
-    with open(f'{cfg.roots.data_root}/addresses.json', mode='r', encoding=cfg.BASE_ENCODING) as f:
-        data = json.load(f)
-        f.close()
+    # получаем данные по точкам из Яндекс Карт
+    # не делая запросы по тем адресам, которые уже известны
 
-    with open(f'{cfg.roots.data_root}/addresses_coords.json', mode='r', encoding=cfg.BASE_ENCODING) as f:
-        dataUsed = json.load(f)
-        f.close()
+    dataUsed = S3O.getObj(
+        cfg.ycloud.bucketName,
+        'addresses_coords.json'
+    )
 
     #2 части: первая - где отсутствуют данные, т.е. новые адреса, вторая - где этих адресов несколько
     data1 = list(filter(lambda x: x['address_txt'] not in dataUsed, data))
@@ -50,17 +65,27 @@ def main():
 
     data = {**dataUsed, **data}
 
-    with open(f'{cfg.roots.data_root}/addresses_coords.json', encoding=cfg.BASE_ENCODING, mode='w+') as f:
-        json.dump(data, f, ensure_ascii=False)
-        f.close()
+    S3O.uploadFile(
+        objToBytesIO(data),
+        cfg.ycloud.bucketName,
+        'addresses_coords.json'
+    )
 
     # обрабатываем полученные данные в финальный файл
     p = Processor(data)
     data = p.parseAddressCoordsToFinalData()
 
-    with open(f'{cfg.roots.data_root}/data.json', encoding=cfg.BASE_ENCODING, mode='w+') as f:
-        json.dump(data, f, ensure_ascii=False)
-        f.close()
+    S3O.uploadFile(
+        objToBytesIO(data),
+        cfg.ycloud.finalBucketName,
+        'data/data.json'
+    )
 
-if __name__ == '__main__':
-    main()
+    #ставим в файл config.json последнюю дату обновления
+    S3O.uploadFile(
+        objToBytesIO({
+            'updated_at': date.today().isoformat()
+        }),
+        cfg.ycloud.finalBucketName,
+        'data/config.json'
+    )

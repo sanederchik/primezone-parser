@@ -1,7 +1,7 @@
-from secret.secret import login, password, yandex_api_key
+from secret.secret import login, password, yandex_api_key, ACCESS_KEY_ID, SECRET_ACCESS_KEY
 
 BASE_ENCODING = 'utf-8'
-PZ_HOST = 'accenture.primezone.ru'
+PZ_HOST = 'ax-team.primezone.ru'
 PZ_BASE_HEADERS = {
     "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
     "accept-language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
@@ -65,4 +65,11 @@ CITIES = {
 }
 
 class roots:
-    data_root = 'data'
+    data_root = 'tmp/data'
+
+class ycloud:
+    endpointUrl = 'https://storage.yandexcloud.net'
+    ACCESS_KEY_ID = ACCESS_KEY_ID
+    SECRET_ACCESS_KEY = SECRET_ACCESS_KEY
+    bucketName = 'pz-parser'
+    finalBucketName = 'pz.makarov-a-d.com'
